@@ -1,0 +1,219 @@
+{
+  "createdAt": "2025-10-01T09:54:22.715Z",
+  "updatedAt": "2025-10-01T09:54:22.715Z",
+  "id": "1mVmqC8MBhEO1e4T",
+  "name": "RAG System with MongoDB",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "webhook1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rag",
+        "responseMode": "lastNode"
+      }
+    },
+    {
+      "id": "switch1",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        300,
+        300
+      ],
+      "parameters": {
+        "conditions": [
+          {
+            "value1": "={{$json.operation}}",
+            "value2": "add"
+          },
+          {
+            "value1": "={{$json.operation}}",
+            "value2": "query"
+          }
+        ]
+      }
+    },
+    {
+      "id": "textSplitter1",
+      "name": "Text Splitter",
+      "type": "n8n-nodes-langchain.textSplitter",
+      "typeVersion": 1,
+      "position": [
+        500,
+        200
+      ],
+      "parameters": {
+        "text": "={{$json.text}}",
+        "chunkSize": 1000,
+        "chunkOverlap": 200
+      }
+    },
+    {
+      "id": "embeddings1",
+      "name": "Embeddings OpenAI",
+      "type": "n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1,
+      "position": [
+        700,
+        200
+      ],
+      "parameters": {
+        "model": "text-embedding-ada-002"
+      }
+    },
+    {
+      "id": "vectorStoreInsert1",
+      "name": "MongoDB Vector Store Insert",
+      "type": "n8n-nodes-langchain.vectorStoreMongoDBAtlas",
+      "typeVersion": 1,
+      "position": [
+        900,
+        200
+      ],
+      "parameters": {
+        "mode": "insert",
+        "mongoCollection": "rag_collection",
+        "embedding": "embedding",
+        "metadata_field": "text",
+        "vectorIndexName": "vector_index"
+      }
+    },
+    {
+      "id": "vectorStoreQuery1",
+      "name": "MongoDB Vector Store Query",
+      "type": "n8n-nodes-langchain.vectorStoreMongoDBAtlas",
+      "typeVersion": 1,
+      "position": [
+        500,
+        400
+      ],
+      "parameters": {
+        "mode": "load",
+        "mongoCollection": "rag_collection",
+        "embedding": "embedding",
+        "metadata_field": "text",
+        "vectorIndexName": "vector_index",
+        "prompt": "={{$json.query}}"
+      }
+    },
+    {
+      "id": "openAiChat1",
+      "name": "OpenAI Chat",
+      "type": "n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        700,
+        400
+      ],
+      "parameters": {
+        "model": "gpt-3.5-turbo",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a helpful assistant. Use the provided context to answer questions accurately. If the context doesn't contain relevant information, say so."
+          },
+          {
+            "role": "user",
+            "content": "={{\"Question: \" + $json.query + \"\\n\\nContext: \" + $json.documents.join(\"\\n\")}}"
+          }
+        ]
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Text Splitter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MongoDB Vector Store Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Splitter": {
+      "main": [
+        [
+          {
+            "node": "Embeddings OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "main": [
+        [
+          {
+            "node": "MongoDB Vector Store Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB Vector Store Query": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "118e1100-1c2d-49bb-abdd-fdc8b78bd15a",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "createdAt": "2025-10-01T09:54:22.717Z",
+      "updatedAt": "2025-10-01T09:54:22.717Z",
+      "role": "workflow:owner",
+      "workflowId": "1mVmqC8MBhEO1e4T",
+      "projectId": "5UR8KLSqHkBhfl0d"
+    }
+  ],
+  "tags": []
+}
