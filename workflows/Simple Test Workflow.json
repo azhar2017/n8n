@@ -1,0 +1,74 @@
+{
+  "createdAt": "2025-10-01T14:30:21.759Z",
+  "updatedAt": "2025-10-01T14:30:21.759Z",
+  "id": "1XVvI0qOcxMirOVW",
+  "name": "Simple Test Workflow",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "parameters": {},
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "id": "2",
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "parameters": {
+        "values": [
+          {
+            "type": "string",
+            "value": "test"
+          }
+        ]
+      },
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "7eb2f386-b628-4785-8a95-332e4637a57d",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "createdAt": "2025-10-01T14:30:21.761Z",
+      "updatedAt": "2025-10-01T14:30:21.761Z",
+      "role": "workflow:owner",
+      "workflowId": "1XVvI0qOcxMirOVW",
+      "projectId": "5UR8KLSqHkBhfl0d"
+    }
+  ],
+  "tags": []
+}
