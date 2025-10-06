@@ -1,0 +1,172 @@
+{
+  "createdAt": "2025-09-18T10:16:45.947Z",
+  "updatedAt": "2025-09-18T10:18:48.374Z",
+  "id": "0UysZU6SGYvRBwu2",
+  "name": "MySQL Natural Language Agent",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "name": "Webhook",
+      "typeVersion": 2.1,
+      "id": "webhook1",
+      "position": [
+        250,
+        300
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "mysql-query",
+        "responseMode": "lastNode",
+        "responseData": "firstEntryJson",
+        "httpMethod": "POST"
+      }
+    },
+    {
+      "name": "Get Schema",
+      "typeVersion": 2.5,
+      "id": "mysql1",
+      "position": [
+        450,
+        300
+      ],
+      "type": "n8n-nodes-base.mySql",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  t.TABLE_NAME,\n  c.COLUMN_NAME,\n  c.DATA_TYPE,\n  c.COLUMN_KEY,\n  c.IS_NULLABLE,\n  k.REFERENCED_TABLE_NAME,\n  k.REFERENCED_COLUMN_NAME\nFROM information_schema.TABLES t\nJOIN information_schema.COLUMNS c \n  ON t.TABLE_NAME = c.TABLE_NAME\nLEFT JOIN information_schema.KEY_COLUMN_USAGE k\n  ON c.TABLE_NAME = k.TABLE_NAME \n  AND c.COLUMN_NAME = k.COLUMN_NAME\nWHERE t.TABLE_SCHEMA = database()\nORDER BY t.TABLE_NAME, c.ORDINAL_POSITION;"
+      }
+    },
+    {
+      "name": "Format Schema",
+      "typeVersion": 2,
+      "id": "function1",
+      "position": [
+        650,
+        300
+      ],
+      "type": "n8n-nodes-base.function",
+      "parameters": {
+        "functionCode": "// Format schema into clear documentation for LLM\nconst schemaData = items[0].json;\n\n// Group by tables\nconst tables = {};\nfor (const row of schemaData) {\n  if (!tables[row.TABLE_NAME]) {\n    tables[row.TABLE_NAME] = {\n      columns: [],\n      relationships: []\n    };\n  }\n  \n  // Add column info\n  tables[row.TABLE_NAME].columns.push({\n    name: row.COLUMN_NAME,\n    type: row.DATA_TYPE,\n    isPrimary: row.COLUMN_KEY === 'PRI',\n    isNullable: row.IS_NULLABLE === 'YES'\n  });\n  \n  // Add relationship if exists\n  if (row.REFERENCED_TABLE_NAME) {\n    tables[row.TABLE_NAME].relationships.push({\n      fromColumn: row.COLUMN_NAME,\n      toTable: row.REFERENCED_TABLE_NAME,\n      toColumn: row.REFERENCED_COLUMN_NAME\n    });\n  }\n}\n\n// Format as clear documentation\nlet documentation = 'Database Schema:\\n\\n';\n\nfor (const [tableName, tableInfo] of Object.entries(tables)) {\n  documentation += `Table: ${tableName}\\n`;\n  documentation += 'Columns:\\n';\n  \n  tableInfo.columns.forEach(col => {\n    const constraints = [\n      col.isPrimary ? 'PRIMARY KEY' : '',\n      !col.isNullable ? 'NOT NULL' : ''\n    ].filter(Boolean).join(', ');\n    \n    documentation += `  - ${col.name} (${col.type})${constraints ? ' ' + constraints : ''}\\n`;\n  });\n  \n  if (tableInfo.relationships.length > 0) {\n    documentation += 'Relationships:\\n';\n    tableInfo.relationships.forEach(rel => {\n      documentation += `  - ${rel.fromColumn} -> ${rel.toTable}(${rel.toColumn})\\n`;\n    });\n  }\n  \n  documentation += '\\n';\n}\n\n// Add the natural language query from webhook input\nconst query = items[0].json.query || 'No query provided';\n\nreturn [{\n  json: {\n    schema: documentation,\n    query: query\n  }\n}];"
+      }
+    },
+    {
+      "name": "Generate SQL",
+      "typeVersion": 1.1,
+      "id": "bedrock1",
+      "position": [
+        850,
+        300
+      ],
+      "type": "nodes-langchain.lmChatAwsBedrock",
+      "parameters": {
+        "prompt": "You are a precise SQL query generator. Your task is to convert natural language questions into SQL queries based on the provided database schema. Follow these rules strictly:\n\n1. ONLY use tables and columns that exist in the schema\n2. ALWAYS use proper JOIN conditions based on the relationships defined\n3. NEVER use columns or tables not listed in the schema\n4. Include appropriate WHERE clauses to filter data\n5. Use proper data types for comparisons\n6. NEVER allow SQL injection by directly using user input\n7. Use aggregation functions (COUNT, SUM, AVG, etc.) when appropriate\n8. Include ORDER BY for sorted results when relevant\n9. Use LIMIT when returning large result sets\n10. Use table aliases for better readability\n\nDatabase Schema:\n{{$node[\"Format Schema\"].json[\"schema\"]}}\n\nNatural Language Query:\n{{$node[\"Format Schema\"].json[\"query\"]}}\n\nRespond ONLY with the SQL query, no explanations or additional text."
+      }
+    },
+    {
+      "name": "Execute Query",
+      "typeVersion": 2.5,
+      "id": "mysql2",
+      "position": [
+        1050,
+        300
+      ],
+      "type": "n8n-nodes-base.mySql",
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{$node[\"Generate SQL\"].json[\"query\"]}}"
+      }
+    },
+    {
+      "name": "Format Response",
+      "typeVersion": 1.1,
+      "id": "bedrock2",
+      "position": [
+        1250,
+        300
+      ],
+      "type": "nodes-langchain.lmChatAwsBedrock",
+      "parameters": {
+        "prompt": "You are a natural language interface for database query results. Convert the SQL query results into clear, concise, and grammatically correct English. Follow these guidelines:\n\n1. Use proper sentence structure and punctuation\n2. Present numerical results with appropriate formatting\n3. Include relevant units if present in the data\n4. Use lists or bullet points for multiple items\n5. Maintain professional and neutral tone\n6. Avoid technical terms unless necessary\n7. Organize information logically\n8. Include relevant context from the original query\n\nOriginal Question:\n{{$node[\"Format Schema\"].json[\"query\"]}}\n\nSQL Query Used:\n{{$node[\"Generate SQL\"].json[\"query\"]}}\n\nQuery Results:\n{{$json[\"results\"]}}\n\nRespond with ONLY the natural language explanation of the results."
+      }
+    }
+  ],
+  "connections": {
+    "Get Schema": {
+      "main": [
+        [
+          {
+            "type": "main",
+            "index": 0,
+            "node": "Format Schema"
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "type": "main",
+            "index": 0,
+            "node": "Get Schema"
+          }
+        ]
+      ]
+    },
+    "Generate SQL": {
+      "main": [
+        [
+          {
+            "type": "main",
+            "index": 0,
+            "node": "Execute Query"
+          }
+        ]
+      ]
+    },
+    "Format Schema": {
+      "main": [
+        [
+          {
+            "type": "main",
+            "index": 0,
+            "node": "Generate SQL"
+          }
+        ]
+      ]
+    },
+    "Execute Query": {
+      "main": [
+        [
+          {
+            "type": "main",
+            "index": 0,
+            "node": "Format Response"
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "5692fbe2-3508-4643-a7ae-dc477c0d7906",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "createdAt": "2025-09-18T10:16:45.949Z",
+      "updatedAt": "2025-09-18T10:16:45.949Z",
+      "role": "workflow:owner",
+      "workflowId": "0UysZU6SGYvRBwu2",
+      "projectId": "5UR8KLSqHkBhfl0d"
+    }
+  ],
+  "tags": []
+}
